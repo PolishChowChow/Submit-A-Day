@@ -1,0 +1,16 @@
+import { Stack } from 'expo-router';
+
+/** Routes behind login (guarded in src/app/_layout.tsx). Tabs plus pushed detail screens. */
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
+export default function AppLayout() {
+  return (
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="days/new" options={{ title: 'Submit today', presentation: 'modal' }} />
+      <Stack.Screen name="days/[id]" options={{ title: 'Day', headerBackTitle: 'Back' }} />
+    </Stack>
+  );
+}
