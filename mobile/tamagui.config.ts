@@ -29,6 +29,9 @@ export const config = createTamagui({
   },
   settings: {
     ...defaultConfig.settings,
+    // The v6 preset only accepts shorthands (`p`, `items`, `text`...). Allow the
+    // full names too (`padding`, `alignItems`, `textAlign`), which read better.
+    onlyAllowShorthands: false,
   },
 });
 
