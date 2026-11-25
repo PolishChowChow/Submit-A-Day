@@ -1,49 +1,51 @@
+import { SplashScreen, Stack } from 'expo-router';
+import { useEffect } from 'react';
 
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
+import { useAuth } from '@/features/auth';
+import { AppProviders } from '@/providers/app-providers';
+import { useAppTheme } from '@/theme';
 
-import {
-  TamaguiProvider,
-} from "tamagui";
-
-import {
-  QueryClient,
-  QueryClientProvider,
-} from "@tanstack/react-query";
-
-import React from "react";
-
-// Create the query client once.
-// Later, move this into a dedicated provider file if needed.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-    },
-  },
-});
+// Keep the splash screen up until the session and theme preference are restored.
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme() ?? "light";
+  return (
+    <AppProviders>
+      <RootNavigator />
+    </AppProviders>
+  );
+}
+
+/**
+ * Chooses the route group from the auth state:
+ * - signed out → (auth)  sign-in, sign-up
+ * - signed in  → (app)   tabs and everything behind login
+ * When the state changes, Expo Router moves to the allowed group automatically.
+ */
+function RootNavigator() {
+  const { status } = useAuth();
+  const theme = useAppTheme();
+  const isReady = status !== 'loading' && theme.isReady;
+
+  useEffect(() => {
+    if (isReady) SplashScreen.hideAsync();
+  }, [isReady]);
+
+  if (!isReady) return null;
+
+  const isSignedIn = status === 'signedIn';
 
   return (
-    <TamaguiProvider
-      defaultTheme={colorScheme}
-    >
-      <QueryClientProvider client={queryClient}>
-        <StatusBar
-          style={colorScheme === "dark" ? "light" : "dark"}
-        />
+    <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+      <Stack.Protected guard={isSignedIn}>
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
 
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: "slide_from_right",
-          }}
-        />
-      </QueryClientProvider>
-    </TamaguiProvider>
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen name="(auth)" />
+      </Stack.Protected>
+
+      <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Not found' }} />
+    </Stack>
   );
 }
