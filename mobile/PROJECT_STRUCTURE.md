@@ -255,7 +255,8 @@ The same URL can't exist in both groups (e.g. an `index.tsx` in `(auth)` **and**
 - The **root layout decides** which group exists, based on `useAuth().status` (details in *Authentication flow* below).
 - **Don't navigate after sign-in or sign-out.** Call `signIn()` / `signOut()` and the guard switches groups by itself. A manual `router.replace('/')` after login races the guard.
 - **Opening a protected URL while signed out** (deep link, refresh on web) lands on `/sign-in`. After signing in the user goes to `/`, not back to the original URL. Add a `redirect` param if that's ever needed.
-- `unstable_settings.initialRouteName` in `(app)/_layout.tsx` is `(tabs)`. A deep link straight to `/days/42` still has the tabs underneath, so the back button works.
+- `unstable_settings.anchor` in `(app)/_layout.tsx` is `(tabs)` (and `sign-in` in `(auth)`). A deep link straight to `/days/42` still has the tabs underneath, so the back button works. In SDK 58 use `anchor`; `initialRouteName` is deprecated.
+- **Every `Stack.Protected` needs `redirectTo` pointing at a real URL.** Without it, a blocked route falls back to the first allowed sibling by its file path. Here that's a group (`/(auth)`, `/(tabs)`), which has no screen of its own, so the user sees a 404 and a URL containing the group name. If you add a guard anywhere, give it a `redirectTo`.
 
 ### Deep links
 
@@ -271,8 +272,8 @@ The same URL can't exist in both groups (e.g. an `index.tsx` in `(auth)` **and**
 1. On launch `AuthProvider` reads the token from secure storage. Until it's done, `status = 'loading'` and the splash screen stays visible.
 2. The root layout renders two guarded groups:
    ```tsx
-   <Stack.Protected guard={isSignedIn}><Stack.Screen name="(app)" /></Stack.Protected>
-   <Stack.Protected guard={!isSignedIn}><Stack.Screen name="(auth)" /></Stack.Protected>
+   <Stack.Protected guard={isSignedIn} redirectTo="/sign-in"><Stack.Screen name="(app)" /></Stack.Protected>
+   <Stack.Protected guard={!isSignedIn} redirectTo="/"><Stack.Screen name="(auth)" /></Stack.Protected>
    ```
    When `status` changes, Expo Router moves to the allowed group by itself. **Never call `router.replace` after login or logout.**
 3. `useSignIn` / `useSignUp` → `signIn(token)` saves the token, sets the `Authorization: Bearer` header, and seeds the `me` query.
