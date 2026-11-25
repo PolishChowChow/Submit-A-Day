@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 
 /** Routes behind login (guarded in src/app/_layout.tsx). Tabs plus pushed detail screens. */
 export const unstable_settings = {
-  initialRouteName: '(tabs)',
+  anchor: '(tabs)',
 };
 
 export default function AppLayout() {
