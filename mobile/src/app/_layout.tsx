@@ -21,6 +21,10 @@ export default function RootLayout() {
  * - signed out → (auth)  sign-in, sign-up
  * - signed in  → (app)   tabs and everything behind login
  * When the state changes, Expo Router moves to the allowed group automatically.
+ *
+ * `redirectTo` is REQUIRED here. Without it a blocked route falls back to the first
+ * allowed sibling by its file path, i.e. the group itself (`/(auth)`, `/(app)`), and a
+ * group has no screen of its own, so that renders a 404. Always point at a real URL.
  */
 function RootNavigator() {
   const { status } = useAuth();
@@ -37,11 +41,11 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
-      <Stack.Protected guard={isSignedIn}>
+      <Stack.Protected guard={isSignedIn} redirectTo="/sign-in">
         <Stack.Screen name="(app)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={!isSignedIn}>
+      <Stack.Protected guard={!isSignedIn} redirectTo="/">
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
