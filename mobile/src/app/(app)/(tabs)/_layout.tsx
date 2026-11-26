@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { CalendarDays, Settings } from 'lucide-react-native';
+import { History, ListChecks, Settings } from 'lucide-react-native';
 
 export default function TabsLayout() {
   return (
@@ -7,8 +7,15 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Days',
-          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          title: 'Today',
+          tabBarIcon: ({ color, size }) => <ListChecks color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="days"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, size }) => <History color={color} size={size} />,
         }}
       />
       <Tabs.Screen

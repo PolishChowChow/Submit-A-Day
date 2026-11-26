@@ -1,6 +1,6 @@
 # src/dev (temporary)
 
-Lets you use the whole app (sign in, switch between the Days and Settings tabs, submit a day) before the backend exists.
+Lets you use the whole app (sign in, switch between the Today, History and Settings tabs, submit a day) before the backend exists.
 
 ## Turn on / off
 

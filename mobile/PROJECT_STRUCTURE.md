@@ -51,11 +51,11 @@ mobile/
     │   └── (app)/                    # 🔒 Signed-in only
     │       ├── _layout.tsx           #    Stack: tabs + pushed screens
     │       ├── (tabs)/
-    │       │   ├── _layout.tsx       #    Bottom tabs (Days, Settings)
-    │       │   ├── index.tsx         #    /          Days tab: all day submissions
+    │       │   ├── _layout.tsx       #    Bottom tabs (Today, History, Settings)
+    │       │   ├── index.tsx         #    /          Today tab (main screen): checklist + "Submit a Day"
+    │       │   ├── days.tsx          #    /days      History tab: all day submissions
     │       │   └── settings.tsx      #    /settings  Theme picker, sign out
     │       └── days/
-    │           ├── new.tsx           #    /days/new  Submit today (modal checklist)
     │           └── [id].tsx          #    /days/:id  One submission: tasks done / not done
     │
     ├── features/                     # One folder per feature; everything it needs lives inside
@@ -71,11 +71,12 @@ mobile/
     │   ├── days/
     │   │   ├── index.ts
     │   │   ├── api.ts                # GET /api/days, GET /api/days/:id, POST /api/days
-    │   │   ├── queries.ts            # ⭐ Reference TanStack Query implementation (+ useTodaySubmission)
+    │   │   ├── queries.ts            # ⭐ Reference TanStack Query implementation (+ useDaySubmission)
     │   │   ├── types.ts              # Day, DayTask, CreateDayInput
-    │   │   ├── utils.ts              # todayIsoDate, formatDayDate, getDayProgress
-    │   │   ├── components/           # day-list-item, task-row, submit-day-form
-    │   │   └── screens/              # days-screen, new-day-screen, day-detail-screen
+    │   │   ├── utils.ts              # todayIsoDate, isSameDay, formatDayDate, getDayProgress
+    │   │   ├── hooks/                # use-today: current date, flips at midnight / on app resume
+    │   │   ├── components/           # day-list-item, task-row, submit-day-form (the checklist)
+    │   │   └── screens/              # today-screen, days-screen, day-detail-screen
     │   ├── tasks/                    # Recurring tasks (the checklist each day is built from)
     │   │   ├── index.ts
     │   │   ├── api.ts                # GET /api/tasks
@@ -130,12 +131,13 @@ Task (recurring)            Day (one submission per calendar date)
 - **Task** is something the user repeats every day ("Read 20 pages").
 - **Day** records, for one date, every recurring task and whether it was completed. Progress = `completed / total` (`getDayProgress`).
 - Submitting sends only `completedTaskIds`. The server fills in the rest as not completed and snapshots the titles.
-- At most one submission per date. The Days tab hides "Submit today" once today exists.
+- At most one submission per date (same year, month and day: `isSameDay`).
+- The **Today** screen (`/`) shows the checklist and a **Submit a Day** button until today is submitted, then **Already done** with the result. If the server answers 409 (submitted from another device), the list is refetched and the screen switches to Already done.
 
 ## Temporary mock mode
 
 `EXPO_PUBLIC_USE_MOCKS=true` (the current default in `.env`) swaps every feature's `api.ts` for an in-memory fake, so the full app works without a backend:
-- Any email and password signs in, or press **Skip sign-in (mock mode)**. Then switch between the **Days** and **Settings** tabs.
+- Any email and password signs in, or press **Skip sign-in (mock mode)**. You land on **Today**. Switch between the **Today**, **History** and **Settings** tabs.
 - 5 tasks and 7 days of history are seeded. Today is open so you can submit it.
 
 Every temporary spot is marked `TEMP` (`grep -rn TEMP src`). The removal steps are in `src/dev/README.md`.
@@ -157,7 +159,7 @@ Navigation is **file-based**: every file in `src/app/` is a screen, and its path
 | `[param].tsx` | Dynamic segment, read with `useLocalSearchParams` | `days/[id].tsx` → `/days/42` |
 | `+not-found.tsx` | Any URL that doesn't match | |
 
-A static file beats a dynamic one, so `/days/new` opens `new.tsx`, not `[id].tsx` with `id = "new"`.
+A static file beats a dynamic one: a `days/new.tsx` would win over `days/[id].tsx` for `/days/new`. `(tabs)/days.tsx` (`/days`) and `days/[id].tsx` (`/days/:id`) don't clash, because they are different paths.
 
 ### Navigator tree
 
@@ -168,9 +170,9 @@ Root Stack                      src/app/_layout.tsx        (providers, splash, a
 │   └── sign-up                 /sign-up
 ├── (app)   Stack               🔒 only when signed IN
 │   ├── (tabs)  Tabs            bottom tab bar, header per tab
-│   │   ├── index               /          "Days" tab
+│   │   ├── index               /          "Today" tab (main screen after sign-in)
+│   │   ├── days                /days      "History" tab
 │   │   └── settings            /settings  "Settings" tab
-│   ├── days/new                /days/new  modal, slides up over the tabs
 │   └── days/[id]               /days/:id  pushed with a back button
 └── +not-found
 ```
@@ -183,9 +185,9 @@ Screens inside `(app)` but outside `(tabs)` (like `days/[id]`) are pushed **over
 |---|---|---|---|---|
 | `/sign-in` | `(auth)/sign-in.tsx` | `SignInScreen` | Signed out | Full screen, no header |
 | `/sign-up` | `(auth)/sign-up.tsx` | `SignUpScreen` | Signed out | Full screen, no header |
-| `/` | `(app)/(tabs)/index.tsx` | `DaysScreen` | Signed in | Tab "Days" |
+| `/` | `(app)/(tabs)/index.tsx` | `TodayScreen` | Signed in | Tab "Today" (landing screen) |
+| `/days` | `(app)/(tabs)/days.tsx` | `DaysScreen` | Signed in | Tab "History" |
 | `/settings` | `(app)/(tabs)/settings.tsx` | `SettingsScreen` | Signed in | Tab "Settings" |
-| `/days/new` | `(app)/days/new.tsx` | `NewDayScreen` | Signed in | Modal |
 | `/days/:id` | `(app)/days/[id].tsx` | `DayDetailScreen` | Signed in | Pushed (title = the date) |
 | anything else | `+not-found.tsx` | 404 | Everyone | |
 
@@ -200,11 +202,11 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 
 // Declarative: preferred for anything tappable
 <Link href="/settings">Settings</Link>
-<Link href="/days/new" asChild><Button>Submit today</Button></Link>      // asChild = the Button becomes the link
+<Link href="/days" asChild><Button>History</Button></Link>      // asChild = the Button becomes the link
 <Link href={{ pathname: '/days/[id]', params: { id: day.id } }} asChild>…</Link>
 
 // Imperative: after an action (e.g. a successful submit)
-router.push('/days/new');   // add to history
+router.push('/days');       // add to history
 router.replace('/');        // swap the current screen (no back)
 router.back();              // close modal / go back
 
@@ -231,7 +233,7 @@ Screens receive plain props (`id`), not router objects, so they stay reusable an
 ### Headers and titles
 
 - **Static** title or presentation: set it in the parent `_layout.tsx`:
-  `<Stack.Screen name="days/new" options={{ title: 'Submit today', presentation: 'modal' }} />`
+  `<Stack.Screen name="days/[id]" options={{ title: 'Day', headerBackTitle: 'Back' }} />` (add `presentation: 'modal'` to slide a screen up instead)
 - **Dynamic** title (depends on data): set it from inside the screen:
   `<Stack.Screen options={{ title: formatDayDate(day.date) }} />` (see `day-detail-screen.tsx`).
 - Tabs: title and icon live in `(tabs)/_layout.tsx` (`tabBarIcon` uses `lucide-react-native`).

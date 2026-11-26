@@ -1,7 +1,7 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { daysApi } from './api';
-import { todayIsoDate } from './utils';
+import { getStreak, isSameDay } from './utils';
 
 /**
  * Reference implementation of the query pattern (see src/lib/query/index.ts).
@@ -38,12 +38,27 @@ export function useDay(id: string) {
   });
 }
 
-/** Today's submission, if there is one (derived from the list, no extra request). */
-export function useTodaySubmission() {
-  const today = todayIsoDate();
+/**
+ * The submission for `date` (same year, month and day), or `null` if that day isn't
+ * submitted yet. Derived from the list, so no extra request.
+ */
+export function useDaySubmission(date: string) {
   return useQuery({
     ...dayQueries.list(),
-    select: (days) => days.find((day) => day.date === today) ?? null,
+    select: (days) => days.find((day) => isSameDay(day.date, date)) ?? null,
+  });
+}
+
+/**
+ * Current and longest streak as of `today` (`YYYY-MM-DD`).
+ * TEMP: computed on the device from the submissions list. If the backend adds a streak
+ * endpoint (e.g. GET /api/streak), swap the select for its own queryOptions here; screens
+ * keep calling useStreak().
+ */
+export function useStreak(today: string) {
+  return useQuery({
+    ...dayQueries.list(),
+    select: (days) => getStreak(days.map((day) => day.date), today),
   });
 }
 
@@ -54,6 +69,11 @@ export function useCreateDay() {
     onSuccess: (day) => {
       queryClient.setQueryData(dayKeys.detail(day.id), day);
       return queryClient.invalidateQueries({ queryKey: dayKeys.lists() });
+    },
+    onError: (error) => {
+      // 409 = this date is already submitted (e.g. from another device): refetch so the
+      // screen switches to "already done" instead of showing an error.
+      if (error.status === 409) return queryClient.invalidateQueries({ queryKey: dayKeys.lists() });
     },
   });
 }

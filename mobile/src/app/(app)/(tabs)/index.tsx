@@ -1,3 +1,3 @@
-import { DaysScreen } from '@/features/days';
+import { TodayScreen } from '@/features/days';
 
-export default DaysScreen;
+export default TodayScreen;
