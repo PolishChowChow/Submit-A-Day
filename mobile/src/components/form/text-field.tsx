@@ -39,7 +39,7 @@ export function TextField<TValues extends FieldValues>({
             {...inputProps}
           />
           {fieldState.error?.message ? (
-            <Paragraph size="2" color="danger">
+            <Paragraph size="2" color="red-500">
               {fieldState.error.message}
             </Paragraph>
           ) : null}

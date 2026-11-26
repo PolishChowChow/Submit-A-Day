@@ -1,8 +1,6 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { Paragraph, Spinner, YStack } from 'tamagui';
-
-import { ErrorState } from './error-state';
+import { Button, Paragraph, Spinner, YStack } from 'tamagui';
 
 type QueryStateProps<TData> = {
   query: UseQueryResult<TData>;
@@ -36,7 +34,12 @@ export function QueryState<TData>({
 
   if (query.isError) {
     return (
-      <ErrorState error={query.error} onRetry={() => query.refetch()} retrying={query.isFetching} />
+      <Centered>
+        <Paragraph textAlign="center">{query.error.message}</Paragraph>
+        <Button onPress={() => query.refetch()} disabled={query.isFetching}>
+          Try again
+        </Button>
+      </Centered>
     );
   }
 

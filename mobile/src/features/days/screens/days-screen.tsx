@@ -1,52 +1,44 @@
-import { router } from 'expo-router';
+import { Link } from 'expo-router';
+import { Plus } from 'lucide-react-native';
 import { FlatList } from 'react-native';
-import { SizableText, YStack } from 'tamagui';
+import { Button, Paragraph, YStack } from 'tamagui';
 
 import { QueryState, Screen } from '@/components/ui';
 
 import { DayListItem } from '../components/day-list-item';
-import { SubmissionCalendar } from '../components/submission-calendar';
-import { useToday } from '../hooks/use-today';
-import { useDays } from '../queries';
+import { useDays, useTodaySubmission } from '../queries';
 
-/** `/days`, the History tab: a calendar of submissions, then every submission, newest first. */
+/** Days tab: every day submission, newest first, plus a shortcut to submit today. */
 export function DaysScreen() {
   const days = useDays();
-  const today = useToday();
+  const today = useTodaySubmission();
 
   return (
     <Screen>
-      <QueryState query={days}>
+      {today.isSuccess && !today.data ? (
+        <Link href="/days/new" asChild>
+          <Button icon={Plus}>Submit today</Button>
+        </Link>
+      ) : null}
+      {today.data ? (
+        <Paragraph textAlign="center" color="placeholder-color">
+          Today is submitted. See you tomorrow!
+        </Paragraph>
+      ) : null}
+
+      <QueryState
+        query={days}
+        isEmpty={(list) => list.length === 0}
+        emptyMessage="No submissions yet. Submit your first day above."
+      >
         {(list) => (
           <FlatList
             data={list}
             keyExtractor={(day) => day.id}
             renderItem={({ item }) => <DayListItem day={item} />}
             ItemSeparatorComponent={() => <YStack height="2" />}
-            ListHeaderComponent={
-              <YStack gap="4" paddingBottom="3">
-                <SubmissionCalendar
-                  days={list}
-                  today={today}
-                  onSelectDay={(day) =>
-                    router.push({ pathname: '/days/[id]', params: { id: day.id } })
-                  }
-                />
-                {list.length > 0 ? (
-                  <SizableText size="4" fontWeight="700">
-                    All submissions
-                  </SizableText>
-                ) : null}
-              </YStack>
-            }
-            ListEmptyComponent={
-              <SizableText textAlign="center" color="placeholder-color" paddingTop="4">
-                No submissions yet. Submit your first day on the Today tab.
-              </SizableText>
-            }
             refreshing={days.isRefetching}
             onRefresh={() => days.refetch()}
-            showsVerticalScrollIndicator={false}
           />
         )}
       </QueryState>
