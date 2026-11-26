@@ -136,7 +136,7 @@ Task (recurring)            Day (one submission per calendar date)
 
 ## Temporary mock mode
 
-`EXPO_PUBLIC_USE_MOCKS=true` (the current default in `.env`) swaps every feature's `api.ts` for an in-memory fake, so the full app works without a backend:
+`EXPO_PUBLIC_USE_MOCKS=true` (the default in `.env.template`) swaps every feature's `api.ts` for an in-memory fake, so the full app works without a backend:
 - Any email and password signs in, or press **Skip sign-in (mock mode)**. You land on **Today**. Switch between the **Today**, **History** and **Settings** tabs.
 - 5 tasks and 7 days of history are seeded. Today is open so you can submit it.
 
@@ -365,20 +365,29 @@ Need the scheme in code? `useColorScheme()` from `@/theme` (not from `react-nati
 
 `cp .env.template .env` and set the real URL. `EXPO_PUBLIC_*` values are bundled into the app, so never put secrets in them.
 
-### Backend contract (assumed, adjust in each feature's `api.ts` / `types.ts`)
+### Backend contract
 
-The `/api` prefix is added once in `src/lib/api/client.ts` (`API_PREFIX`). Feature `api.ts` files use paths without it (`'/days'`), and `EXPO_PUBLIC_API_URL` is the bare server origin (`http://localhost:3000`).
-| Method | Path | Body → Response |
+The backend is the NestJS API in [`../server`](../server). Its endpoints, request and response shapes, and status codes are listed in **[server/PROJECT_STRUCTURE.md → Endpoints](../server/PROJECT_STRUCTURE.md#endpoints)**. That table is the source of truth, so it isn't repeated here.
+
+- The `/api` prefix is added once in `src/lib/api/client.ts` (`API_PREFIX`). Feature `api.ts` files use paths without it (`'/days'`), and `EXPO_PUBLIC_API_URL` is the bare server origin (`http://localhost:3000`).
+- `features/*/types.ts` mirror the server's response shapes field for field. **Change both sides together**, along with that table.
+- The server answers errors with `{ statusCode, message: string | string[], error }`. For 4xx, `toApiError` shows `message` (or its first item) to the user; for 5xx it shows its own generic text.
+- The server returns 401 only for a missing, expired or invalid session, which is why any 401 signs the user out here.
+- To use the real server: set `EXPO_PUBLIC_USE_MOCKS=false`, and set `EXPO_PUBLIC_API_URL` to an address the device can reach. See [server/PROJECT_STRUCTURE.md → Reaching the API from the app](../server/PROJECT_STRUCTURE.md#reaching-the-api-from-the-app): the Android emulator needs `10.0.2.2`, and a phone needs your PC's LAN IP. Restart `npx expo start` after changing `.env`.
+
+### Running against the real server
+
+In `server/`: `npm run db:up`, `npm run start:dev`, then `npm run db:seed`. Sign in with one of the seeded accounts:
+
+| Email | History | Use it to test |
 |---|---|---|
-| POST | `/api/auth/login` | `{ email, password }` → `{ token, user }` |
-| POST | `/api/auth/register` | `{ name, email, password }` → `{ token, user }` |
-| GET | `/api/auth/me` | → `User` |
-| GET | `/api/tasks` | → `Task[]` |
-| GET | `/api/days` | → `Day[]` (newest first) |
-| GET | `/api/days/:id` | → `Day` |
-| POST | `/api/days` | `{ date: 'YYYY-MM-DD', completedTaskIds: string[], note? }` → `Day` (409 if date exists) |
+| `demo@example.com` | 5 tasks, the last 7 days submitted, today open | Same data as the app's mock mode: Today checklist, a 7-day streak, History, day detail |
+| `streak@example.com` | 5 tasks, 51 days over ~2 months with gaps | Calendar and streaks: current **10**, best **22**, every completion level from 0/5 to 5/5 |
+| `new@example.com` | 3 tasks, no submissions | First submission, 0-day streak, empty History |
 
-Error responses may include `{ message: string | string[] }`. It's shown to the user.
+Password for all three: **`password123`**.
+
+Re-run `npm run db:seed` to reset them (for example, to re-open today after submitting it). The **Skip sign-in** button only exists in mock mode: its fake token gets a 401 from the real server. Details: [server/PROJECT_STRUCTURE.md → Seed data](../server/PROJECT_STRUCTURE.md#seed-data-test-accounts).
 
 ### app.json highlights
 - Plugins: `expo-router`, `expo-splash-screen`, `expo-secure-store`
