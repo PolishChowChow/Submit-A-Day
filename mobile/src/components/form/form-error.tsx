@@ -4,7 +4,7 @@ import { Paragraph } from 'tamagui';
 export function FormError({ message }: { message?: string | null }) {
   if (!message) return null;
   return (
-    <Paragraph color="red-500" textAlign="center">
+    <Paragraph color="danger" textAlign="center">
       {message}
     </Paragraph>
   );

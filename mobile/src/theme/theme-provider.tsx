@@ -89,11 +89,13 @@ function NavigationTheme({
     ...base,
     colors: {
       ...base.colors,
+      // 60%: screen background. 30%: header and tab bar. 10%: active tab / back button.
       background: theme.background?.val ?? base.colors.background,
-      card: theme.background?.val ?? base.colors.card,
+      card: theme.surface?.val ?? base.colors.card,
       text: theme.color?.val ?? base.colors.text,
       border: theme['border-color']?.val ?? base.colors.border,
-      primary: theme.color?.val ?? base.colors.primary,
+      primary: theme.primary?.val ?? base.colors.primary,
+      notification: theme.danger?.val ?? base.colors.notification,
     },
   };
 
