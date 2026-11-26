@@ -11,7 +11,7 @@ export function DayListItem({ day }: { day: Day }) {
 
   return (
     <Link href={{ pathname: '/days/[id]', params: { id: day.id } }} asChild>
-      <Card padding="3" gap="1">
+      <Card padding="3" gap="1" backgroundColor="surface" borderRadius="4">
         <XStack justifyContent="space-between" alignItems="center">
           <SizableText size="3" fontWeight="700">
             {formatDayDate(day.date)}

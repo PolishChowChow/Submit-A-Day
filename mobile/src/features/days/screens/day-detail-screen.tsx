@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
-import { H3, Paragraph, Progress, Separator, YStack } from 'tamagui';
+import { H3, Paragraph, Separator, YStack } from 'tamagui';
 
-import { QueryState, Screen } from '@/components/ui';
+import { ProgressBar, QueryState, Screen } from '@/components/ui';
 
 import { TaskRow } from '../components/task-row';
 import { useDay } from '../queries';
@@ -23,7 +23,7 @@ export function DayDetailScreen({ id }: { id: string }) {
                 <H3>
                   {completed} / {total} tasks completed
                 </H3>
-                <Progress value={Math.round(ratio * 100)} />
+                <ProgressBar value={ratio} label={`${completed} of ${total} tasks done`} />
               </YStack>
               <YStack>
                 {data.tasks.map((task) => (

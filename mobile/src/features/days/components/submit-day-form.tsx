@@ -1,84 +1,68 @@
-import { Controller, useForm } from 'react-hook-form';
-import { Button, Label, Paragraph, Spinner, YStack } from 'tamagui';
+import { useState } from 'react';
+import { Card, Paragraph, Separator, YStack } from 'tamagui';
 
-import { FormError, TextField } from '@/components/form';
+import { FormError } from '@/components/form';
+import { PrimaryButton, ProgressBar } from '@/components/ui';
 import type { Task } from '@/features/tasks';
 
 import { useCreateDay } from '../queries';
-import { todayIsoDate } from '../utils';
 import { TaskRow } from './task-row';
 
-type FormValues = {
-  completedTaskIds: string[];
-  note: string;
-};
-
 type SubmitDayFormProps = {
+  /** `YYYY-MM-DD` being submitted. */
+  date: string;
   tasks: Task[];
-  onSubmitted?: () => void;
 };
 
-/** Today's submission: tick the recurring tasks you completed, add an optional note. */
-export function SubmitDayForm({ tasks, onSubmitted }: SubmitDayFormProps) {
+/** The day's checklist: tick what you completed, then "Submit a Day" sends it to the backend. */
+export function SubmitDayForm({ date, tasks }: SubmitDayFormProps) {
   const createDay = useCreateDay();
-  const { control, handleSubmit } = useForm<FormValues>({
-    defaultValues: { completedTaskIds: [], note: '' },
-  });
+  const [checked, setChecked] = useState<ReadonlySet<string>>(() => new Set());
 
-  const onSubmit = () =>
-    void handleSubmit(({ completedTaskIds, note }) =>
-      createDay.mutate(
-        { date: todayIsoDate(), completedTaskIds, note: note.trim() || undefined },
-        { onSuccess: () => onSubmitted?.() }
-      )
-    )();
+  const toggle = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  // Checks stay as they are on failure, so pressing the button again simply retries.
+  const submit = () => createDay.mutate({ date, completedTaskIds: [...checked] });
+
+  // 409 (already submitted) isn't shown: the Today screen switches to "Already done" instead.
+  const errorMessage = createDay.error?.status === 409 ? undefined : createDay.error?.message;
 
   return (
     <YStack gap="4">
-      <Controller
-        control={control}
-        name="completedTaskIds"
-        render={({ field: { value, onChange } }) => (
-          <YStack>
-            <Label>
-              Completed today ({value.length} / {tasks.length})
-            </Label>
-            {tasks.length === 0 ? (
-              <Paragraph color="placeholder-color">You have no recurring tasks yet.</Paragraph>
-            ) : (
-              tasks.map((task) => {
-                const checked = value.includes(task.id);
-                return (
-                  <TaskRow
-                    key={task.id}
-                    title={task.title}
-                    completed={checked}
-                    onToggle={() =>
-                      onChange(checked ? value.filter((id) => id !== task.id) : [...value, task.id])
-                    }
-                  />
-                );
-              })
-            )}
-          </YStack>
-        )}
-      />
-      <TextField
-        control={control}
-        name="note"
-        label="Note (optional)"
-        placeholder="Anything worth remembering about today…"
-        multiline
-        minHeight={80}
-      />
-      <FormError message={createDay.error?.message} />
-      <Button
-        onPress={onSubmit}
-        disabled={createDay.isPending}
-        icon={createDay.isPending ? <Spinner /> : undefined}
-      >
-        Submit today
-      </Button>
+      {tasks.length === 0 ? (
+        <Paragraph color="placeholder-color">You have no recurring tasks yet.</Paragraph>
+      ) : (
+        <>
+          <ProgressBar
+            value={checked.size / tasks.length}
+            label={`${checked.size} of ${tasks.length} tasks done`}
+          />
+          <Card backgroundColor="surface" paddingHorizontal="4" borderRadius="4">
+            {tasks.map((task, index) => (
+              <YStack key={task.id}>
+                {index > 0 ? <Separator borderColor="border-color" /> : null}
+                <TaskRow
+                  title={task.title}
+                  completed={checked.has(task.id)}
+                  onToggle={createDay.isPending ? undefined : () => toggle(task.id)}
+                />
+              </YStack>
+            ))}
+          </Card>
+        </>
+      )}
+
+      <FormError message={errorMessage} />
+
+      <PrimaryButton onPress={submit} loading={createDay.isPending}>
+        {createDay.isError && errorMessage ? 'Try again' : 'Submit a Day'}
+      </PrimaryButton>
     </YStack>
   );
 }
