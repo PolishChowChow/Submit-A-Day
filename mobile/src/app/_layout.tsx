@@ -49,6 +49,9 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
+      {/* GitHub's OAuth redirect: reachable signed in (connect) and signed out (sign in). */}
+      <Stack.Screen name="oauth/github" />
+
       <Stack.Screen name="+not-found" options={{ headerShown: true, title: 'Not found' }} />
     </Stack>
   );

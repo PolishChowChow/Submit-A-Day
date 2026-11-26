@@ -38,3 +38,26 @@ export function useSignUp() {
   const completeAuth = useCompleteAuth();
   return useMutation({ mutationFn: authApi.signUp, onSuccess: completeAuth });
 }
+
+/** Sign in (or sign up) with a GitHub authorization. Pair with useGitHubFlow. */
+export function useGitHubSignIn() {
+  const completeAuth = useCompleteAuth();
+  return useMutation({ mutationFn: authApi.signInWithGitHub, onSuccess: completeAuth });
+}
+
+/** Connect GitHub to the signed-in account; updates the cached user. Pair with useGitHubFlow. */
+export function useLinkGitHub() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.linkGitHub,
+    onSuccess: (user) => queryClient.setQueryData(authKeys.me(), user),
+  });
+}
+
+export function useUnlinkGitHub() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: authApi.unlinkGitHub,
+    onSuccess: (user) => queryClient.setQueryData(authKeys.me(), user),
+  });
+}

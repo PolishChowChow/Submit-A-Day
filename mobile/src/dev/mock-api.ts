@@ -3,7 +3,13 @@
  * Same shapes as the real API, so screens and queries don't know the difference.
  * Data resets on every reload. Only type imports from features (no runtime cycles).
  */
-import type { AuthResponse, SignInInput, SignUpInput, User } from '@/features/auth/types';
+import type {
+  AuthResponse,
+  GitHubAuthInput,
+  SignInInput,
+  SignUpInput,
+  User,
+} from '@/features/auth/types';
 import type { CreateDayInput, Day } from '@/features/days/types';
 import type { Task } from '@/features/tasks/types';
 import { ApiError } from '@/lib/api/errors';
@@ -23,7 +29,13 @@ function isoDaysAgo(daysAgo: number): string {
 
 // ---- seed data ---------------------------------------------------------------
 
-let user: User = { id: 'u1', name: 'Demo User', email: 'demo@example.com' };
+let user: User = {
+  id: 'u1',
+  name: 'Demo User',
+  email: 'demo@example.com',
+  hasPassword: true,
+  github: null,
+};
 
 const tasks: Task[] = [
   { id: 't1', title: 'Drink 2L of water' },
@@ -67,10 +79,23 @@ let days: Day[] = history.map((entry) =>
 export const mockAuthApi = {
   signIn: (_input: SignInInput): Promise<AuthResponse> => wait({ token: MOCK_TOKEN, user }),
   signUp: (input: SignUpInput): Promise<AuthResponse> => {
-    user = { id: 'u1', name: input.name, email: input.email };
+    user = { id: 'u1', name: input.name, email: input.email, hasPassword: true, github: null };
     return wait({ token: MOCK_TOKEN, user });
   },
   me: (): Promise<User> => wait(user),
+  // Mock mode never contacts GitHub; these only flip the demo user's GitHub state.
+  signInWithGitHub: (_input: GitHubAuthInput): Promise<AuthResponse> => {
+    user = { ...user, github: { login: 'demo-octocat' } };
+    return wait({ token: MOCK_TOKEN, user });
+  },
+  linkGitHub: (_input: GitHubAuthInput): Promise<User> => {
+    user = { ...user, github: { login: 'demo-octocat' } };
+    return wait(user);
+  },
+  unlinkGitHub: (): Promise<User> => {
+    user = { ...user, github: null };
+    return wait(user);
+  },
 };
 
 export const mockTasksApi = {

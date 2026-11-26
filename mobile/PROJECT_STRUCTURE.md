@@ -9,6 +9,7 @@ Expo SDK 58 / React Native app for iOS, Android and Web.
 | Server state | TanStack Query v5 + Axios |
 | Forms | React Hook Form |
 | Device storage | `expo-secure-store` (native) / `localStorage` (web) |
+| GitHub sign-in | `expo-auth-session` (authorization code + PKCE); the server holds the secret |
 
 > Keep this file updated whenever folders, conventions, or core dependencies change.
 
@@ -44,6 +45,7 @@ mobile/
     ├── app/                          # ROUTES ONLY (thin files that render feature screens)
     │   ├── _layout.tsx               # Providers + splash + auth guard (Stack.Protected)
     │   ├── +not-found.tsx            # 404
+    │   ├── oauth/github.tsx          # GitHub's OAuth redirect target (both auth states; web popup closes here)
     │   ├── (auth)/                   # 🔓 Signed-out only
     │   │   ├── _layout.tsx           #    Stack, no header, initial route sign-in
     │   │   ├── sign-in.tsx           #    /sign-in
@@ -62,11 +64,12 @@ mobile/
     │   ├── auth/
     │   │   ├── index.ts              # Public API: import only from '@/features/auth'
     │   │   ├── auth-provider.tsx     # Session context: status, token, signIn, signOut
-    │   │   ├── api.ts                # Endpoint calls (POST /api/auth/login, /api/auth/register, GET /api/auth/me)
-    │   │   ├── queries.ts            # authKeys, useCurrentUser, useSignIn, useSignUp
-    │   │   ├── types.ts              # User, SignInInput, SignUpInput, AuthResponse
+    │   │   ├── api.ts                # /api/auth/login, /register, /me, /github, /github/link, DELETE /github
+    │   │   ├── queries.ts            # authKeys, useCurrentUser, useSignIn, useSignUp, useGitHubSignIn, useLinkGitHub, useUnlinkGitHub
+    │   │   ├── github.ts             # GitHub OAuth (expo-auth-session + PKCE): useGitHubAuthorization, useGitHubFlow
+    │   │   ├── types.ts              # User (+ hasPassword, github), SignInInput, SignUpInput, AuthResponse, GitHubAuthInput
     │   │   ├── validation.ts         # react-hook-form rules
-    │   │   ├── components/           # sign-in-form, sign-up-form
+    │   │   ├── components/           # sign-in-form, sign-up-form, github-sign-in-button
     │   │   └── screens/              # sign-in-screen, sign-up-screen
     │   ├── days/
     │   │   ├── index.ts
@@ -189,6 +192,7 @@ Screens inside `(app)` but outside `(tabs)` (like `days/[id]`) are pushed **over
 | `/days` | `(app)/(tabs)/days.tsx` | `DaysScreen` | Signed in | Tab "History" |
 | `/settings` | `(app)/(tabs)/settings.tsx` | `SettingsScreen` | Signed in | Tab "Settings" |
 | `/days/:id` | `(app)/days/[id].tsx` | `DayDetailScreen` | Signed in | Pushed (title = the date) |
+| `/oauth/github` | `oauth/github.tsx` | Spinner, then goes back | Everyone | GitHub's redirect target; not navigated to by the app |
 | anything else | `+not-found.tsx` | 404 | Everyone | |
 
 In development, open **`/_sitemap`** (web) to see every route Expo Router knows about.
@@ -285,6 +289,27 @@ Guards are client-side only. The backend must still authorize every request.
 
 Where to put a new screen: see *Routing → Recipes* above.
 
+### GitHub sign-in
+
+**Continue with GitHub** (Sign in, Sign up) and **Settings → GitHub** (connect / disconnect) use `features/auth/github.ts`:
+
+1. `useGitHubAuthorization()` wraps `useAuthRequest` from `expo-auth-session`: authorization code + **PKCE**, scopes `read:user user:email`, redirect `makeRedirectUri({ path: 'oauth/github' })`.
+   - development build: `mobile://oauth/github`
+   - web: `<origin>/oauth/github`
+   - expo-auth-session generates and checks `state` itself; a mismatch comes back as an error result.
+2. `useGitHubFlow(mutation)` starts the prompt **synchronously from the tap**: on web, a popup opened later is blocked. If GitHub returns a code, it runs the mutation with `{ code, redirectUri, codeVerifier }`.
+   - `useGitHubSignIn` → `POST /api/auth/github` → `signIn(token)`, as with a password.
+   - `useLinkGitHub` → `POST /api/auth/github/link` → updates the cached `me`.
+   - Closing the browser, or **Cancel** on GitHub (`access_denied`), is not an error.
+3. The **server** exchanges the code with the client secret. The app never holds a GitHub token or secret: only the public client ID (`EXPO_PUBLIC_GITHUB_CLIENT_ID`).
+4. `src/app/oauth/github.tsx` is the redirect target. On web it calls `WebBrowser.maybeCompleteAuthSession()`, which hands the URL to the opener and closes the popup. On Android the deep link also lands here, and the screen just goes back. It sits outside both guards, because the redirect arrives signed out (sign in) or signed in (connect).
+
+Rules from the server you'll see in the UI:
+- An email that already has a password account gets 409 "Sign in with your password, then connect GitHub in Settings". The server never links by email.
+- An account created with GitHub has `hasPassword: false`, so Settings shows no **Disconnect**.
+
+Setup (registering the GitHub app, callback URLs, server env): [server/PROJECT_STRUCTURE.md → GitHub sign-in](../server/PROJECT_STRUCTURE.md#github-sign-in). **Expo Go can't do OAuth**: test on web or in a development build (`npx expo run:android` / `run:ios`). With `EXPO_PUBLIC_GITHUB_CLIENT_ID` unset the GitHub buttons are hidden. In mock mode the GitHub calls are faked, but the button still opens real GitHub, so it needs the client ID.
+
 ---
 
 ## Data fetching (TanStack Query)
@@ -362,6 +387,7 @@ Need the scheme in code? `useColorScheme()` from `@/theme` (not from `react-nati
 |---|---|---|
 | `EXPO_PUBLIC_API_URL` | `src/constants/config.ts` | Yes: the app throws on startup if it's missing |
 | `EXPO_PUBLIC_USE_MOCKS` | `src/dev/flags.ts` | TEMP. `true` = fake backend |
+| `EXPO_PUBLIC_GITHUB_CLIENT_ID` | `src/constants/config.ts` | No. Public GitHub client ID; unset = GitHub buttons hidden |
 
 `cp .env.template .env` and set the real URL. `EXPO_PUBLIC_*` values are bundled into the app, so never put secrets in them.
 
@@ -421,4 +447,5 @@ npx expo-doctor         # diagnose dependency/config issues
 | Data | `@tanstack/react-query`, `axios` |
 | Forms | `react-hook-form` |
 | Storage | `expo-secure-store` |
+| OAuth (GitHub) | `expo-auth-session` + its peer `expo-crypto`, `expo-web-browser` |
 | Animation | `react-native-reanimated`, `react-native-worklets`, `react-native-gesture-handler` |
